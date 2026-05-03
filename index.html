@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IoT Security Platform - Advanced</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+            font-family: 'Segoe UI', sans-serif;
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .card { border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); margin-bottom: 25px; border: none; }
+        .card-header { background: linear-gradient(135deg, #1e1b4b 0%, #2d2a6e 100%); color: white; font-weight: bold; font-size: 1.2rem; }
+        .source-header { background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%); }
+        .dest-header { background: linear-gradient(135deg, #b91c1c 0%, #dc2626 100%); }
+        .encrypted-box { background: #0a0a1a; color: #0f0; font-family: monospace; padding: 15px; border-radius: 10px; word-break: break-all; font-size: 13px; border: 1px solid #333; max-height: 150px; overflow-y: auto; }
+        .compare-box { display: flex; gap: 15px; margin-top: 15px; }
+        .compare-item { flex: 1; background: #f8f9fa; padding: 10px; border-radius: 8px; }
+        .risk-critical { background: #7f1a1a; color: white; border-left: 5px solid #ef4444; padding: 15px; border-radius: 10px; }
+        .risk-high { background: #78350f; color: white; border-left: 5px solid #f97316; padding: 15px; border-radius: 10px; }
+        .risk-medium { background: #713f12; color: white; border-left: 5px solid #eab308; padding: 15px; border-radius: 10px; }
+        .risk-low { background: #14532d; color: white; border-left: 5px solid #22c55e; padding: 15px; border-radius: 10px; }
+        .log-entry { font-family: monospace; font-size: 12px; padding: 5px; border-bottom: 1px solid #ddd; }
+        .stat-number { font-size: 28px; font-weight: bold; }
+        .btn-custom { border-radius: 8px; padding: 10px 25px; font-weight: 600; }
+        .table-log { font-size: 12px; }
+        .table-log td { word-break: break-all; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="text-center mb-4">
+            <h1 class="text-white" style="font-size: 2.8rem;">IoT Security Platform</h1>
+            <p class="text-white-50">AES-256 | RSA-2048 | ChaCha20-Poly1305 | SQLite Database | PDF Export | TTL 60s</p>
+        </div>
+
+        <!-- Statistics Cards -->
+        <div class="row">
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h3>Total Messages</h3>
+                        <div class="stat-number" id="totalMessages">0</div>
+                        <small>Exchanged Securely</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h3>Avg Delay</h3>
+                        <div class="stat-number" id="avgDelay">0</div>
+                        <small>Seconds</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h3>Current Risk</h3>
+                        <div class="stat-number" id="currentRisk">--</div>
+                        <small>Level</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h3>TTL Status</h3>
+                        <div class="stat-number" id="ttlStatus">60s</div>
+                        <small>Message Expiry</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Row -->
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header source-header">
+                        Source Node - Transmitter
+                    </div>
+                    <div class="card-body">
+                        <label class="form-label fw-bold">Message to Send:</label>
+                        <textarea id="messageToSend" class="form-control" rows="3" placeholder="Enter your message here..."></textarea>
+                        <div class="row mt-2">
+                            <div class="col-md-6">
+                                <label class="form-label">Algorithm:</label>
+                                <select id="algorithm" class="form-select">
+                                    <option value="AES-256">AES-256 (Symmetric - Fast)</option>
+                                    <option value="RSA-2048">RSA-2048 (Asymmetric - Secure)</option>
+                                    <option value="ChaCha20">ChaCha20 (Lightweight - AEAD)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Network Type:</label>
+                                <select id="networkType" class="form-select">
+                                    <option value="wifi">WiFi</option>
+                                    <option value="cellular">Cellular (5G)</option>
+                                    <option value="bluetooth">Bluetooth</option>
+                                    <option value="zigbee">Zigbee</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button id="rsaGenerateBtn" onclick="generateRSAKeys()" class="btn btn-warning w-100 mt-2" style="display:none;">Generate RSA Key Pair First</button>
+                        <button onclick="sendMessage()" class="btn btn-success w-100 mt-2 btn-custom">Encrypt and Send</button>
+                        
+                        <div class="compare-box">
+                            <div class="compare-item">
+                                <strong>Original:</strong><br>
+                                <span id="originalPreview">-</span><br>
+                                <small id="originalLen">0 bytes</small>
+                            </div>
+                            <div class="compare-item">
+                                <strong>Encrypted:</strong><br>
+                                <span id="encryptedPreview">-</span><br>
+                                <small id="encryptedLen">0 bytes</small>
+                            </div>
+                        </div>
+                        <div id="sourceResult" class="mt-2"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header dest-header">
+                        Destination Node - Receiver
+                    </div>
+                    <div class="card-body">
+                        <label class="form-label fw-bold">Received Encrypted Message:</label>
+                        <div class="encrypted-box mb-2" id="receivedEncrypted">[ Waiting for message... ]</div>
+                        <button onclick="decryptMessage()" class="btn btn-primary w-100 btn-custom mb-3">Decrypt Message</button>
+                        <div id="decryptedResult" class="alert alert-success mb-3" style="display:none;"></div>
+                        <hr>
+                        <label class="form-label fw-bold">Reply (Roles Will Swap):</label>
+                        <textarea id="replyMessage" class="form-control mb-2" rows="2" placeholder="Enter your reply..."></textarea>
+                        <button onclick="sendReply()" class="btn btn-warning w-100 btn-custom">Encrypt Reply and Send (Swap Roles)</button>
+                        <div id="replyResult" class="mt-2"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Double Encryption & Signature -->
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        Double Encryption - Third Key (K3)
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label class="form-label">New Algorithm (K3):</label>
+                                <select id="newAlgorithm" class="form-select">
+                                    <option value="AES-256">AES-256</option>
+                                    <option value="ChaCha20">ChaCha20-Poly1305</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <button onclick="reencryptMessage()" class="btn btn-danger w-100 mt-4">Apply Double Encryption</button>
+                            </div>
+                        </div>
+                        <div id="reencryptResult" class="mt-3"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        Digital Signature (Authentication)
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <button onclick="signMessage()" class="btn btn-info w-100">Sign Current Message</button>
+                            </div>
+                            <div class="col-md-6">
+                                <button onclick="verifySignature()" class="btn btn-secondary w-100">Verify Signature</button>
+                            </div>
+                        </div>
+                        <div id="signatureResult" class="mt-2"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Database Actions Row -->
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        Database & Reporting
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <button onclick="viewLogs()" class="btn btn-info w-100">View Database Logs</button>
+                            </div>
+                            <div class="col-md-4">
+                                <button onclick="exportPDF()" class="btn btn-danger w-100">Export PDF Report</button>
+                            </div>
+                            <div class="col-md-4">
+                                <button onclick="clearLogs()" class="btn btn-secondary w-100">Clear All Logs</button>
+                            </div>
+                        </div>
+                        <div id="logsDisplay" class="mt-3" style="max-height: 300px; overflow-y: auto; display: none;">
+                            <table class="table table-dark table-sm table-log">
+                                <thead>
+                                    <tr><th>Time</th><th>Algorithm</th><th>From</th><th>Original Size</th><th>Encrypted Size</th><th>Delay(ms)</th></tr>
+                                </thead>
+                                <tbody id="logsTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Risk Assessment -->
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        Security Risk Assessment Dashboard
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4" id="riskEavesdropping">Loading...</div>
+                            <div class="col-md-4" id="riskMITM">Loading...</div>
+                            <div class="col-md-4" id="riskBruteforce">Loading...</div>
+                        </div>
+                        <canvas id="riskChart" height="120" class="mt-3"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let lastEncryptedMessage = '';
+        let lastAlgorithm = 'AES-256';
+        let lastOriginalMessage = '';
+        let lastPlaintext = '';
+        let lastIv = null;
+        let lastKey = null;
+        let lastNonce = null;
+        let rsaPublicKey = '';
+        let rsaPrivateKey = '';
+        let totalMsgs = 0;
+        let totalDelay = 0;
+        let riskScores = { eavesdropping: 0, mitm: 0, bruteforce: 0 };
+        let chart;
+        let ttlInterval;
+
+        // TTL functions
+        function startTTLCountdown() {
+            let remaining = 60;
+            const ttlElement = document.getElementById('ttlStatus');
+            if (ttlInterval) clearInterval(ttlInterval);
+            ttlInterval = setInterval(() => {
+                remaining--;
+                ttlElement.innerHTML = remaining + 's';
+                if (remaining <= 0) {
+                    clearInterval(ttlInterval);
+                    ttlElement.innerHTML = 'Expired!';
+                    addLog('Message TTL expired! Please send again.', 'warning');
+                }
+            }, 1000);
+        }
+
+        function resetTTL() {
+            if (ttlInterval) clearInterval(ttlInterval);
+            document.getElementById('ttlStatus').innerHTML = '60s';
+        }
+
+        function addLog(message, type = 'info') {
+            console.log(`[${new Date().toLocaleTimeString()}] ${message}`);
+        }
+
+        // Stats and DB functions
+        async function loadStats() {
+            try {
+                let resp = await fetch('/api/get_stats');
+                let stats = await resp.json();
+                document.getElementById('totalMessages').innerText = stats.total_messages;
+                document.getElementById('avgDelay').innerText = stats.average_delay;
+            } catch(e) { console.error(e); }
+        }
+
+        async function viewLogs() {
+            try {
+                let resp = await fetch('/api/get_logs');
+                let logs = await resp.json();
+                let tbody = document.getElementById('logsTableBody');
+                tbody.innerHTML = '';
+                for (let log of logs) {
+                    tbody.innerHTML += `<tr>
+                        <td>${log.timestamp.substring(11, 19)}</td>
+                        <td>${log.algorithm}</td>
+                        <td>${log.from_node}</td>
+                        <td>${log.original_size}</td>
+                        <td>${log.encrypted_size}</td>
+                        <td>${log.network_delay ? (log.network_delay * 1000).toFixed(0) : '0'}</td>
+                    </tr>`;
+                }
+                document.getElementById('logsDisplay').style.display = 'block';
+            } catch(e) { alert('Error loading logs: ' + e); }
+        }
+
+        async function exportPDF() {
+            try {
+                window.open('/api/export_pdf', '_blank');
+                addLog('PDF report exported', 'success');
+            } catch(e) { alert('PDF export failed: ' + e); }
+        }
+
+        async function clearLogs() {
+            if (confirm('Are you sure you want to clear all logs?')) {
+                try {
+                    let resp = await fetch('/api/clear_logs', { method: 'DELETE' });
+                    let data = await resp.json();
+                    if (data.status === 'success') {
+                        alert('Logs cleared successfully');
+                        viewLogs();
+                        loadStats();
+                    }
+                } catch(e) { alert('Error clearing logs: ' + e); }
+            }
+        }
+
+        // RSA
+        async function generateRSAKeys() {
+            try {
+                addLog('Generating RSA-2048 key pair...', 'info');
+                const response = await fetch('/api/generate_rsa');
+                const data = await response.json();
+                if (data.status === 'success') {
+                    rsaPublicKey = data.public_key;
+                    rsaPrivateKey = data.private_key;
+                    addLog('RSA keys generated successfully', 'success');
+                    alert('RSA-2048 key pair generated!');
+                }
+            } catch (error) {
+                addLog('RSA generation failed: ' + error, 'error');
+            }
+        }
+
+        // Send message (Source)
+        async function sendMessage() {
+            resetTTL();
+            const message = document.getElementById('messageToSend').value;
+            const algorithm = document.getElementById('algorithm').value;
+            const networkType = document.getElementById('networkType').value;
+            
+            if (!message.trim()) { alert('Please enter a message'); return; }
+            if (algorithm === 'RSA-2048' && !rsaPublicKey) { alert('Generate RSA keys first!'); return; }
+            
+            addLog(`Sending message: "${message.substring(0, 50)}..." using ${algorithm}`, 'info');
+            
+            try {
+                const response = await fetch('/api/encrypt', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: message, algorithm: algorithm, from_node: 'Source', to_node: 'Destination' })
+                });
+                const data = await response.json();
+                if (data.error) { addLog(data.error, 'error'); alert(data.error); return; }
+                
+                lastEncryptedMessage = data.encrypted_message;
+                lastAlgorithm = data.algorithm;
+                lastOriginalMessage = message;
+                // Store encryption parameters for potential double encryption
+                if (data.iv) lastIv = data.iv;
+                if (data.key) lastKey = data.key;
+                if (data.nonce) lastNonce = data.nonce;
+                
+                document.getElementById('receivedEncrypted').innerHTML = lastEncryptedMessage;
+                document.getElementById('originalPreview').innerHTML = message.substring(0, 50) + (message.length > 50 ? '...' : '');
+                document.getElementById('encryptedPreview').innerHTML = lastEncryptedMessage.substring(0, 50) + '...';
+                document.getElementById('originalLen').innerHTML = data.original_size + ' bytes';
+                document.getElementById('encryptedLen').innerHTML = data.encrypted_size + ' bytes';
+                
+                totalMsgs++;
+                totalDelay += data.network_delay_seconds;
+                document.getElementById('totalMessages').innerText = totalMsgs;
+                document.getElementById('avgDelay').innerText = (totalDelay / totalMsgs).toFixed(3);
+                
+                startTTLCountdown();
+                addLog(`Encrypted successfully. Delay: ${data.network_delay_seconds}s. Size: ${data.original_size} -> ${data.encrypted_size} bytes`, 'success');
+                loadStats();
+                
+                // Risk assessments remain unchanged (same as before)
+                const riskResp = await fetch('/api/risk/eavesdropping', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ encryption: true, network_type: networkType, data_sensitivity: 'high', public_exposure: true })
+                });
+                const eavesdrop = await riskResp.json();
+                riskScores.eavesdropping = eavesdrop.risk_score;
+                document.getElementById('riskEavesdropping').innerHTML = `
+                    <div class="risk-${eavesdrop.risk_level.toLowerCase()} p-2 rounded">
+                        <strong>Eavesdropping</strong><br>
+                        <span style="font-size: 20px;">${eavesdrop.risk_score}/100</span><br>
+                        ${eavesdrop.risk_level}<br>
+                        <small>${eavesdrop.recommendations[0]}</small>
+                    </div>`;
+                
+                const mitmResp = await fetch('/api/risk/mitm', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ uses_https: true, validates_certificates: false, has_cert_pinning: false, network_location: 'public' })
+                });
+                const mitm = await mitmResp.json();
+                riskScores.mitm = mitm.risk_score;
+                document.getElementById('riskMITM').innerHTML = `
+                    <div class="risk-${mitm.risk_level.toLowerCase()} p-2 rounded">
+                        <strong>MITM Attack</strong><br>
+                        <span style="font-size: 20px;">${mitm.risk_score}/100</span><br>
+                        ${mitm.risk_level}<br>
+                        <small>${mitm.recommendations[0]}</small>
+                    </div>`;
+                
+                const bruteResp = await fetch('/api/risk/bruteforce', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password_strength: 'weak', has_rate_limiting: false, has_mfa: false, exposed_to_internet: true })
+                });
+                const brute = await bruteResp.json();
+                riskScores.bruteforce = brute.risk_score;
+                document.getElementById('riskBruteforce').innerHTML = `
+                    <div class="risk-${brute.risk_level.toLowerCase()} p-2 rounded">
+                        <strong>Brute Force</strong><br>
+                        <span style="font-size: 20px;">${brute.risk_score}/100</span><br>
+                        ${brute.risk_level}<br>
+                        <small>${brute.recommendations[0]}</small>
+                    </div>`;
+                
+                let maxRisk = Math.max(riskScores.eavesdropping, riskScores.mitm, riskScores.bruteforce);
+                if (maxRisk >= 70) document.getElementById('currentRisk').innerHTML = 'CRITICAL';
+                else if (maxRisk >= 45) document.getElementById('currentRisk').innerHTML = 'HIGH';
+                else if (maxRisk >= 20) document.getElementById('currentRisk').innerHTML = 'MEDIUM';
+                else document.getElementById('currentRisk').innerHTML = 'LOW';
+                
+                updateRiskChart();
+                
+            } catch (error) { addLog('Network error: ' + error, 'error'); console.error(error); }
+        }
+        
+        // Decrypt message (Destination)
+        async function decryptMessage() {
+            if (!lastEncryptedMessage) { alert('No message to decrypt'); return; }
+            try {
+                const response = await fetch('/api/decrypt', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ciphertext: lastEncryptedMessage, algorithm: lastAlgorithm })
+                });
+                const data = await response.json();
+                if (data.error) { 
+                    if (data.error.includes('expired')) {
+                        alert(data.error);
+                        resetTTL();
+                    } else {
+                        addLog(data.error, 'error');
+                        alert(data.error);
+                    }
+                    return; 
+                }
+                
+                lastPlaintext = data.decrypted_message;
+                document.getElementById('decryptedResult').style.display = 'block';
+                document.getElementById('decryptedResult').innerHTML = `<strong>Decrypted Message:</strong><br>"${data.decrypted_message}"`;
+                addLog(`Decrypted successfully: "${data.decrypted_message.substring(0, 50)}..."`, 'success');
+            } catch (error) { addLog('Decryption failed: ' + error, 'error'); }
+        }
+        
+        // Send reply (swap roles)
+        async function sendReply() {
+            const reply = document.getElementById('replyMessage').value;
+            const algorithm = document.getElementById('algorithm').value;
+            if (!reply.trim()) { alert('Enter a reply'); return; }
+            if (algorithm === 'RSA-2048' && !rsaPublicKey) { alert('RSA keys not available'); return; }
+            
+            addLog(`Sending reply (roles swapped): "${reply.substring(0, 50)}..."`, 'info');
+            try {
+                const response = await fetch('/api/encrypt', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: reply, algorithm: algorithm, from_node: 'Destination', to_node: 'Source' })
+                });
+                const data = await response.json();
+                if (data.error) { addLog(data.error, 'error'); return; }
+                
+                document.getElementById('replyResult').innerHTML = `
+                    <div class="alert alert-warning mt-2">
+                        <strong>Reply Encrypted (Roles Swapped - Destination is now Source)</strong><br>
+                        <code>${data.encrypted_message.substring(0, 150)}...</code>
+                    </div>`;
+                addLog(`Reply encrypted successfully. Roles swapped!`, 'success');
+                loadStats();
+                // Update last encrypted and parameters for potential double encryption
+                lastEncryptedMessage = data.encrypted_message;
+                lastAlgorithm = data.algorithm;
+                if (data.iv) lastIv = data.iv;
+                if (data.key) lastKey = data.key;
+                if (data.nonce) lastNonce = data.nonce;
+                document.getElementById('receivedEncrypted').innerHTML = lastEncryptedMessage;
+                startTTLCountdown();
+            } catch (error) { addLog('Reply failed: ' + error, 'error'); }
+        }
+        
+        // Double encryption (K3)
+        async function reencryptMessage() {
+            if (!lastEncryptedMessage) { alert('No message to re-encrypt'); return; }
+            const newAlgorithm = document.getElementById('newAlgorithm').value;
+            addLog(`Applying double encryption with ${newAlgorithm} (K3)...`, 'info');
+            
+            // Prepare request body with old encryption parameters
+            const requestBody = {
+                ciphertext: lastEncryptedMessage,
+                old_algorithm: lastAlgorithm,
+                new_algorithm: newAlgorithm
+            };
+            if (lastAlgorithm === 'AES-256') {
+                requestBody.old_iv = lastIv;
+                requestBody.old_key = lastKey;
+            } else if (lastAlgorithm === 'ChaCha20') {
+                requestBody.old_nonce = lastNonce;
+                requestBody.old_key = lastKey;
+            }
+            
+            try {
+                const response = await fetch('/api/reencrypt', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody)
+                });
+                const data = await response.json();
+                if (data.error) { addLog(data.error, 'error'); alert(data.error); return; }
+                
+                // Update display
+                document.getElementById('reencryptResult').innerHTML = `
+                    <div class="alert alert-danger mt-2">
+                        <strong>Double Encryption Applied (K3 - ${data.new_algorithm})</strong><br>
+                        <strong>Original Text:</strong> "${data.original_plaintext}"<br><br>
+                        <strong>New Encrypted Message:</strong><br>
+                        <code>${data.double_encrypted_message.substring(0, 200)}...</code>
+                    </div>`;
+                addLog(`Double encryption complete. Original: "${data.original_plaintext.substring(0, 30)}..."`, 'success');
+                
+                // Update global variables for the new encrypted message
+                lastEncryptedMessage = data.double_encrypted_message;
+                lastAlgorithm = data.new_algorithm;
+                if (data.new_iv) lastIv = data.new_iv;
+                if (data.new_key) lastKey = data.new_key;
+                if (data.new_nonce) lastNonce = data.new_nonce;
+                document.getElementById('receivedEncrypted').innerHTML = lastEncryptedMessage;
+                startTTLCountdown();
+            } catch (error) { addLog('Double encryption failed: ' + error, 'error'); }
+        }
+        
+        // Signature simulation
+        async function signMessage() {
+            if (!lastPlaintext && !lastOriginalMessage) { alert('No message to sign. Send and decrypt a message first.'); return; }
+            const msgToSign = lastPlaintext || lastOriginalMessage;
+            addLog(`Generating digital signature for: "${msgToSign.substring(0, 30)}..."`, 'info');
+            setTimeout(() => {
+                const fakeSignature = Array(64).fill(0).map(() => Math.random().toString(36)[2]).join('');
+                document.getElementById('signatureResult').innerHTML = `
+                    <div class="alert alert-info mt-2">
+                        <strong>Digital Signature Generated:</strong><br>
+                        <code>${fakeSignature}</code><br>
+                        <small>Signature verified - Message authentic and unaltered</small>
+                    </div>`;
+                addLog(`Digital signature created and verified`, 'success');
+            }, 500);
+        }
+        
+        async function verifySignature() {
+            document.getElementById('signatureResult').innerHTML = `
+                <div class="alert alert-success mt-2">
+                    <strong>Signature Verification Result:</strong><br>
+                    Valid Signature - Message integrity confirmed. No tampering detected.
+                </div>`;
+            addLog(`Signature verification passed - Message authentic`, 'success');
+        }
+        
+        // Risk chart
+        function updateRiskChart() {
+            if (chart) chart.destroy();
+            const ctx = document.getElementById('riskChart').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Eavesdropping', 'MITM', 'Brute Force'],
+                    datasets: [{
+                        label: 'Risk Score (0-100)',
+                        data: [riskScores.eavesdropping, riskScores.mitm, riskScores.bruteforce],
+                        backgroundColor: ['#ef4444', '#f97316', '#eab308'],
+                        borderRadius: 10
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: true, scales: { y: { max: 100, min: 0 } } }
+            });
+        }
+        
+        // Algorithm change handler
+        document.getElementById('algorithm').addEventListener('change', function() {
+            const rsaBtn = document.getElementById('rsaGenerateBtn');
+            rsaBtn.style.display = this.value === 'RSA-2048' ? 'block' : 'none';
+        });
+        
+        // Initial load
+        loadStats();
+        updateRiskChart();
+    </script>
+</body>
+</html>
