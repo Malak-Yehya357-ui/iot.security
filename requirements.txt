@@ -3,3 +3,4 @@ pycryptodome==3.19.1
 cryptography==41.0.7
 flask_sqlalchemy
 reportlab
+gunicorn
