@@ -14,6 +14,7 @@ from datetime import datetime
 import time
 import random
 import os
+import SQLAlchemy
 
 app = Flask(__name__)
 app.secret_key = 'iot-security-secret-key-2026'
