@@ -15,7 +15,6 @@ import time
 import random
 import os
 
-
 app = Flask(__name__)
 app.secret_key = 'iot-security-secret-key-2026'
 
