@@ -439,11 +439,4 @@ def clear_logs():
         return jsonify({'error': str(e)}), 500
 
 
-if __name__ == '__main__':
-    print("=" * 50)
-    print("IoT Security Platform Started")
-    print("=" * 50)
-    print(f"Database: {app.config['SQLALCHEMY_DATABASE_URI']}")
-    print(f"Server: http://127.0.0.1:5000")
-    print("=" * 50)
-    app.run(debug=True, host='127.0.0.1', port=5000)
+
